@@ -1,15 +1,19 @@
-# dither-dream
+# Variations on Floyd-Steinberg dithering algorithm
 
-Dither-dream is a tool for exploring variations on the Floyd-Steinberg dithering algorithm.
+Based on [Dither-dream](https://kgjenkins.github.io/dither-dream/), this is a new tool extending the possibilities to explore variations on the Floyd-Steinberg dithering algorithm.
 
-Try the [Dither-dream online demo](https://kgjenkins.github.io/dither-dream/)
+Try it [here](https://leolca.github.io/floyd-steinberg-dithering/)
 
 ---
+
+# Dithering
+
+Dithering is a technique used in digital imaging to create the illusion of color depth in images with a limited color palette by strategically placing pixels of different colors next to each other.
 
 
 # What is the Floyd-Steinberg algorithm?
 
-The [Floyd-Steinberg dithering algorithm](https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering) is a method for reducing an image into a reduced set of colors while attempting to minimize perceptual changes.
+The [Floyd-Steinberg algorithm](https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering) disperses quantization error to neighboring pixels, minimizing perceptual changes and creating halftone compositions that provide smoother gradients in images with limited colors.
 
 Dithering is particulary useful when converting to a bitonal image that only has two colors (like black and white).  For example, consider this original full-color image (well, the real original was a 17th-century painting, "Vanitas with the Spinario" by the Dutch artist [Pieter Claesz](https://en.wikipedia.org/wiki/Pieter_Claesz)):
 
