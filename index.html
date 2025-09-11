@@ -26,6 +26,18 @@ Image URL:
   </div>
 
   <div>
+  <label for="image_selector">Select an image:</label>
+  <select id="image_selector">
+    <option value="image/vanitas.png">Vanitas</option>
+    <option value="image/lenna.png">Lena</option>
+    <option value="image/airplane.png">Airplane</option>
+    <option value="image/sailboat.png">Sailboat</option>
+    <option value="image/pepper.png">Pepper</option>
+    <option value="file_input_trigger">Choose your own image...</option>
+  </select>
+  
+  <input type="file" id="file_input" accept="image/*" style="display: none;" />
+    <br>
     Weights for distributing error to neighboring pixels:
     <br>
     <input id='a' value='7' type='range' step='1' min='0' max='24' />

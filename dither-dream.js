@@ -40,14 +40,40 @@ function initialize() {
     dither();
   });
 
-  // handle url change
-  document.getElementById('url').addEventListener('input', function() {
-    load_img(this.value);
+
+  // Listen for a change on the dropdown
+  image_selector.addEventListener('change', function() {
+    const selected_value = this.value;
+  
+    if (selected_value === 'file_input_trigger') {
+      // If the "Choose your own image" option is selected, trigger the hidden file input
+      file_input.click();
+    } else {
+      // Otherwise, load the predefined image
+      load_img(selected_value);
+    }
+  });
+  
+  // Listen for a change on the hidden file input
+  file_input.addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        load_img(e.target.result);
+      };
+      reader.readAsDataURL(file);
+      
+      // Optional: Reset the dropdown to a default state or the first option
+      // to prevent it from showing "Choose your own image..." permanently.
+      // For example: image_selector.value = 'image/vanitas.png';
+    }
   });
 
-  load_img(document.getElementById('url').value);
-  return;
+  // Load the initial image from the default selected option
+  load_img(image_selector.value);
 
+  return;
 };
 
 function randomize() {
@@ -194,6 +220,10 @@ function grayscale(data) {
   }
   return data;
 }
+
+// Get the dropdown and the hidden file input elements
+const image_selector = document.getElementById('image_selector');
+const file_input = document.getElementById('file_input');
 
 var weights = [7, 3, 5, 1];
 var serpentine = false;
