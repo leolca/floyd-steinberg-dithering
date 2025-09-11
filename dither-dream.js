@@ -35,6 +35,10 @@ function initialize() {
     serpentine = this.checked;
     dither();
   });
+  document.getElementById('randomize').addEventListener('change', function() {
+    randomize_weights = this.checked;
+    dither();
+  });
 
   // handle url change
   document.getElementById('url').addEventListener('input', function() {
@@ -84,7 +88,9 @@ function reset() {
   document.getElementById('contrast').value = 0;
   document.getElementById('contrast-label').innerHTML = 0;
   document.getElementById('serpentine').checked = false;
+  document.getElementById('randomize').checked = false;
   serpentine = false;
+  randomize_weights = false;
   weights = [7, 3, 5, 1];
   dither();
 }
@@ -165,7 +171,7 @@ function dither() {
   var imagedata = screenctx.getImageData(0, 0, 512, 512);
   var data = imagedata.data;
   data = grayscale(data);
-  data = floyd_steinberg(data, 512, 512, weights, serpentine);
+  data = floyd_steinberg(data, 512, 512, weights, serpentine, randomize_weights);
   screenctx.putImageData(imagedata, 0, 0);
   screenctx.showing_original = false;
 }
@@ -191,6 +197,7 @@ function grayscale(data) {
 
 var weights = [7, 3, 5, 1];
 var serpentine = false;
+var randomize_weights = false; 
 
 //function floyd_steinberg(data, width, height) {
 //  for (var i=0; i<data.length; i+=4) {
@@ -354,7 +361,7 @@ var serpentine = false;
 //    return data;
 //}
 
-function floyd_steinberg(data, width, height, weights, serpentine) {
+function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights) {
     for (var y = 0; y < height; y++) {
         let x_start = 0;
         let x_end = width;
@@ -375,6 +382,16 @@ function floyd_steinberg(data, width, height, weights, serpentine) {
             data[i + 1] = b ? 255 : 0;
             data[i + 2] = b ? 255 : 0;
             data[i + 3] = b ? 255 : 0;
+            
+            // Determine effective weights for the current pixel
+            let eff_weights = [];
+            if (randomize_weights) {
+                for (let k = 0; k < weights.length; k++) {
+                    eff_weights.push(Math.floor(Math.random() * (weights[k] + 1)));
+                }
+            } else {
+                eff_weights = weights;
+            }
 
             // Determine which neighbors are available
             const neighbor_exists = {
@@ -384,40 +401,39 @@ function floyd_steinberg(data, width, height, weights, serpentine) {
                 bottom_ahead: ((x + x_step >= 0 && x + x_step < width) && (y + 1 < height))
             };
 
-            // Calculate the sum of weights for available neighbors
+            // Calculate the sum of effective weights for available neighbors
             let current_weights = [];
             let weights_sum = 0;
 
-            // Use the correct weight index based on the scan direction
             const ahead_weight_idx = 0;
             const bottom_backwards_weight_idx = (x_step === 1) ? 1 : 3;
             const bottom_weight_idx = 2;
             const bottom_ahead_weight_idx = (x_step === 1) ? 3 : 1;
 
             if (neighbor_exists.ahead) {
-                weights_sum += weights[ahead_weight_idx];
-                current_weights.push(weights[ahead_weight_idx]);
+                weights_sum += eff_weights[ahead_weight_idx];
+                current_weights.push(eff_weights[ahead_weight_idx]);
             } else {
                 current_weights.push(0);
             }
 
             if (neighbor_exists.bottom_backwards) {
-                weights_sum += weights[bottom_backwards_weight_idx];
-                current_weights.push(weights[bottom_backwards_weight_idx]);
+                weights_sum += eff_weights[bottom_backwards_weight_idx];
+                current_weights.push(eff_weights[bottom_backwards_weight_idx]);
             } else {
                 current_weights.push(0);
             }
 
             if (neighbor_exists.bottom) {
-                weights_sum += weights[bottom_weight_idx];
-                current_weights.push(weights[bottom_weight_idx]);
+                weights_sum += eff_weights[bottom_weight_idx];
+                current_weights.push(eff_weights[bottom_weight_idx]);
             } else {
                 current_weights.push(0);
             }
 
             if (neighbor_exists.bottom_ahead) {
-                weights_sum += weights[bottom_ahead_weight_idx];
-                current_weights.push(weights[bottom_ahead_weight_idx]);
+                weights_sum += eff_weights[bottom_ahead_weight_idx];
+                current_weights.push(eff_weights[bottom_ahead_weight_idx]);
             } else {
                 current_weights.push(0);
             }
