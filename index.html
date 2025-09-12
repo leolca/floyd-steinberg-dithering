@@ -16,6 +16,8 @@ Image URL:
 
 <section id='display-section' ondrop='dropFile(event);' ondragover='dragOver(event);' ondragenter='dragOver(event)';>
   <canvas id='screen' width=512 height=512></canvas>
+  <br>
+  <button id="save-button">Save Dithered Image</button>
 </section>
 
 <section id='dashboard-section'>
@@ -33,6 +35,10 @@ Image URL:
     <option value="image/airplane.png">Airplane</option>
     <option value="image/sailboat.png">Sailboat</option>
     <option value="image/pepper.png">Pepper</option>
+    <option value="image/graylevels.png">Gray levels 50, 25, 12.5 and 6.25</option>
+    <option value="image/gradient-horizontal.png">Gradient Horizontal</option>
+    <option value="image/gradient-vertical.png">Gradient Vertical</option>
+    <option value="image/gradient-diagonal.png">Gradient Diagonal</option>
     <option value="file_input_trigger">Choose your own image...</option>
   </select>
   
@@ -63,6 +69,12 @@ Image URL:
     <br>
     <label for="randomize">Use Random Weights:</label>
     <input type="checkbox" id="randomize">
+    <br>
+    <br>
+    <p>Mean Squared Error (MSE): <span id="mse-label">0.00</span></p>
+    <p>Signal-to-Noise Ratio (SNR): <span id="snr-label">0.00 dB</span></p>
+    <p>Peak Signal-to-Noise Ratio (PSNR): <span id="psnr-label">0.00 dB</span></p>
+    <p>Structural Similarity Index (SSIM): <span id="ssim-label">0.00</span></p>
     <br>
     <br>
     <button id='reset' onclick='randomize()'>randomize</button>
