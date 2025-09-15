@@ -35,8 +35,22 @@ function initialize() {
     serpentine = this.checked;
     dither();
   });
+  //document.getElementById('randomize').addEventListener('change', function() {
+  //  randomize_weights = this.checked;
+  //  dither();
+  //});
   document.getElementById('randomize').addEventListener('change', function() {
-    randomize_weights = this.checked;
+      randomize_weights = this.checked;
+      const orderedOption = document.getElementById('ordered-option');
+      if (this.checked) {
+          orderedOption.style.display = 'block';
+      } else {
+          orderedOption.style.display = 'none';
+      }
+      dither();
+  });
+  document.getElementById('ordered_weights').addEventListener('change', function() {
+    ordered_weights = this.checked;
     dither();
   });
   document.getElementById('weight_factor_slider').addEventListener('input', function() {
@@ -150,8 +164,10 @@ function reset() {
   document.getElementById('randomize').checked = false;
   document.getElementById('weight_factor_slider').value = 1;
   document.getElementById('weight_factor_value').innerHTML = 1;
+  document.getElementById('ordered_weights').checked = false;
   serpentine = false;
   randomize_weights = false;
+  ordered_weights = false;
   weights = [7, 3, 5, 1];
   weight_factor = 1.0;
   dither();
@@ -285,7 +301,7 @@ function dither() {
   let dithered_data = new Uint8ClampedArray(grayscale_data);
   
   // Apply Floyd-Steinberg dithering to the dithered_data
-  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, randomize_weights, weight_factor);
+  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, randomize_weights, ordered_weights, weight_factor);
   
   // Update the visible canvas with the final dithered image
   screenctx.putImageData(new ImageData(dithered_data, screenctx.canvas.width, screenctx.canvas.height), 0, 0);
@@ -349,12 +365,13 @@ const file_input = document.getElementById('file_input');
 var weights = [7, 3, 5, 1];
 var serpentine = false;
 var randomize_weights = false;
+var ordered_weights = false;
 var weight_factor = 1.0;
 
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights, weight_factor) {
+function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights, ordered_weights, weight_factor) {
     // 1. Convert the input Uint8ClampedArray to a Float32Array for accurate calculations
     const float_data = new Float32Array(data.length);
     for (let i = 0; i < data.length; i++) {
@@ -390,6 +407,9 @@ function floyd_steinberg(data, width, height, weights, serpentine, randomize_wei
             if (randomize_weights) {
                 for (let k = 0; k < weights.length; k++) {
                     eff_weights.push(Math.floor(Math.random() * (weights[k] + 1)));
+                }
+                if (ordered_weights) {
+                    eff_weights.sort((a, b) => b - a); // Sort in descending order
                 }
             } else {
                 eff_weights = weights;
