@@ -589,9 +589,9 @@ function calculateMSE(originalData, ditheredData) {
     // Iterate over the RGB channels only (steps of 4 for RGBA)
     for (let i = 0; i < originalData.length; i += 4) {
         // Calculate squared error for each color channel
-        sum_squared_error += Math.pow(originalData[i] - ditheredData[i], 2);
-        sum_squared_error += Math.pow(originalData[i + 1] - ditheredData[i + 1], 2);
-        sum_squared_error += Math.pow(originalData[i + 2] - ditheredData[i + 2], 2);
+        sum_squared_error += Math.pow((originalData[i] - ditheredData[i])/255, 2);
+        sum_squared_error += Math.pow((originalData[i + 1] - ditheredData[i + 1])/255, 2);
+        sum_squared_error += Math.pow((originalData[i + 2] - ditheredData[i + 2])/255, 2);
     }
     // Divide by the total number of color channels (excluding alpha)
     const num_pixels = originalData.length / 4;
@@ -608,9 +608,9 @@ function calculateSNR(originalData, mse) {
     if (mse === 0) return Infinity; // Avoid division by zero
     let signal_power = 0;
     for (let i = 0; i < originalData.length; i += 4) {
-        signal_power += Math.pow(originalData[i], 2);
-        signal_power += Math.pow(originalData[i + 1], 2);
-        signal_power += Math.pow(originalData[i + 2], 2);
+        signal_power += Math.pow(originalData[i]/255, 2);
+        signal_power += Math.pow(originalData[i + 1]/255, 2);
+        signal_power += Math.pow(originalData[i + 2]/255, 2);
     }
     const num_pixels = originalData.length / 4;
     const signal_avg_power = signal_power / (num_pixels * 3);
@@ -626,7 +626,7 @@ function calculateSNR(originalData, mse) {
  */
 function calculatePSNR(mse) {
     if (mse === 0) return Infinity; // Avoid division by zero
-    const max_pixel_value = 255;
+    const max_pixel_value = 1;
     const psnr = Math.pow(max_pixel_value, 2) / mse;
     // Return in decibels
     return 10 * Math.log10(psnr);
