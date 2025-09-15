@@ -39,7 +39,11 @@ function initialize() {
     randomize_weights = this.checked;
     dither();
   });
-
+  document.getElementById('weight_factor_slider').addEventListener('input', function() {
+    document.getElementById('weight_factor_value').innerHTML = this.value;
+    weight_factor = +this.value;
+    dither(); 
+  });
 
   // Listen for a change on the dropdown
   image_selector.addEventListener('change', function() {
@@ -144,9 +148,12 @@ function reset() {
   document.getElementById('contrast-label').innerHTML = 0;
   document.getElementById('serpentine').checked = false;
   document.getElementById('randomize').checked = false;
+  document.getElementById('weight_factor_slider').value = 1;
+  document.getElementById('weight_factor_value').innerHTML = 1;
   serpentine = false;
   randomize_weights = false;
   weights = [7, 3, 5, 1];
+  weight_factor = 1.0;
   dither();
 }
 
@@ -278,7 +285,7 @@ function dither() {
   let dithered_data = new Uint8ClampedArray(grayscale_data);
   
   // Apply Floyd-Steinberg dithering to the dithered_data
-  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, randomize_weights);
+  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, randomize_weights, weight_factor);
   
   // Update the visible canvas with the final dithered image
   screenctx.putImageData(new ImageData(dithered_data, screenctx.canvas.width, screenctx.canvas.height), 0, 0);
@@ -342,11 +349,12 @@ const file_input = document.getElementById('file_input');
 var weights = [7, 3, 5, 1];
 var serpentine = false;
 var randomize_weights = false;
+var weight_factor = 1.0;
 
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights) {
+function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights, weight_factor) {
     // 1. Convert the input Uint8ClampedArray to a Float32Array for accurate calculations
     const float_data = new Float32Array(data.length);
     for (let i = 0; i < data.length; i++) {
@@ -408,27 +416,27 @@ function floyd_steinberg(data, width, height, weights, serpentine, randomize_wei
 
             // Apply error diffusion using the floating-point array
             if (ahead_x >= 0 && ahead_x < width) {
-                const weight = eff_weights[0] / available_weights_sum;
+                const weight = (eff_weights[0] / available_weights_sum) * weight_factor;
                 float_data[i + x_step * 4] += err * weight;
                 float_data[i + x_step * 4 + 1] += err * weight;
                 float_data[i + x_step * 4 + 2] += err * weight;
             }
             if (bottom_y < height) {
                 if ((x - x_step) >= 0 && (x - x_step) < width) {
-                    const weight = eff_weights[1] / available_weights_sum;
+                    const weight = (eff_weights[1] / available_weights_sum) * weight_factor;
                     const index = i + width * 4 - x_step * 4;
                     float_data[index] += err * weight;
                     float_data[index + 1] += err * weight;
                     float_data[index + 2] += err * weight;
                 }
-                const weight = eff_weights[2] / available_weights_sum;
+                const weight = (eff_weights[2] / available_weights_sum) * weight_factor;
                 const index = i + width * 4;
                 float_data[index] += err * weight;
                 float_data[index + 1] += err * weight;
                 float_data[index + 2] += err * weight;
 
                 if ((x + x_step) >= 0 && (x + x_step) < width) {
-                    const weight = eff_weights[3] / available_weights_sum;
+                    const weight = (eff_weights[3] / available_weights_sum) * weight_factor;
                     const index = i + width * 4 + x_step * 4;
                     float_data[index] += err * weight;
                     float_data[index + 1] += err * weight;
