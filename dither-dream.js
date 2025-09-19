@@ -40,6 +40,7 @@ function initialize() {
     const randomizeCheckbox = document.getElementById('randomize');
     const permuteCheckbox = document.getElementById('permuteWeights');
     const contrastCheckbox = document.getElementById('contrast_aware_weights');
+    const contrastCheckbox2 = document.getElementById('contrast_aware_weights2');
     if (this.checked) {
         randomizeCheckbox.disabled = true;
         randomizeCheckbox.checked = false;
@@ -50,10 +51,14 @@ function initialize() {
         contrastCheckbox.disabled = true;
         contrastCheckbox.checked = false;
         contrast_aware_weights = false;
+        contrastCheckbox2.disabled = true;
+        contrastCheckbox2.checked = false;
+        contrast_aware_weights2 = false;
     } else {
         randomizeCheckbox.disabled = false;
         permuteCheckbox.disabled = false;
         contrastCheckbox.disabled = false;
+        contrastCheckbox2.disabled = false;
     }
     dither();
   });
@@ -62,6 +67,7 @@ function initialize() {
     const randomizeCheckbox = document.getElementById('randomize');
     const circularCheckbox = document.getElementById('circularWeights');
     const contrastCheckbox = document.getElementById('contrast_aware_weights');
+    const contrastCheckbox2 = document.getElementById('contrast_aware_weights2');
     if (this.checked) {
         randomizeCheckbox.disabled = true;
         randomizeCheckbox.checked = false;
@@ -72,10 +78,14 @@ function initialize() {
         contrastCheckbox.disabled = true;
         contrastCheckbox.checked = false;
         contrast_aware_weights = false;
+        contrastCheckbox2.disabled = true;
+        contrastCheckbox2.checked = false;
+        contrast_aware_weights2 = false;
     } else {
         randomizeCheckbox.disabled = false;
         circularCheckbox.disabled = false;
         contrastCheckbox.disabled = false;
+        contrastCheckbox2.disabled = false;
     }
     dither();
   });
@@ -107,20 +117,44 @@ function initialize() {
   document.getElementById('contrast_aware_weights').addEventListener('change', function() {
     contrast_aware_weights = this.checked;
 
+    const contrastCheckbox2 = document.getElementById('contrast_aware_weights2');
     if (this.checked) {
         document.getElementById('a').disabled = true;
         document.getElementById('b').disabled = true;
         document.getElementById('c').disabled = true;
         document.getElementById('d').disabled = true;
+        contrastCheckbox2.disabled = true;
     } else {
         document.getElementById('a').disabled = false;
         document.getElementById('b').disabled = false;
         document.getElementById('c').disabled = false;
         document.getElementById('d').disabled = false;
+        contrastCheckbox2.disabled = false;
     }
 
     dither();
   });
+  document.getElementById('contrast_aware_weights2').addEventListener('change', function() {
+    contrast_aware_weights2 = this.checked;
+
+    const contrastCheckbox = document.getElementById('contrast_aware_weights');
+    if (this.checked) {
+        document.getElementById('a').disabled = true;
+        document.getElementById('b').disabled = true;
+        document.getElementById('c').disabled = true;
+        document.getElementById('d').disabled = true;
+        contrastCheckbox.disabled = true;
+    } else {
+        document.getElementById('a').disabled = false;
+        document.getElementById('b').disabled = false;
+        document.getElementById('c').disabled = false;
+        document.getElementById('d').disabled = false;
+        contrastCheckbox.disabled = false;
+    }
+
+    dither();
+  });
+
 
   // Listen for a change on the dropdown
   image_selector.addEventListener('change', function() {
@@ -231,6 +265,7 @@ function reset() {
   document.getElementById('weight_factor_value').innerHTML = 1;
   document.getElementById('ordered_weights').checked = false;
   document.getElementById('contrast_aware_weights').checked = false;
+  document.getElementById('contrast_aware_weights2').checked = false;
   serpentine = false;
   circularweights = false;
   permuteweigts = false;
@@ -239,6 +274,7 @@ function reset() {
   weights = [7, 3, 5, 1];
   weight_factor = 1.0;
   contrast_aware_weights = false;
+  contrast_aware_weights2 = false;
   dither();
 }
 
@@ -370,7 +406,7 @@ function dither() {
   let dithered_data = new Uint8ClampedArray(grayscale_data);
   
   // Apply Floyd-Steinberg dithering to the dithered_data
-  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights);
+  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2);
   
   // Update the visible canvas with the final dithered image
   screenctx.putImageData(new ImageData(dithered_data, screenctx.canvas.width, screenctx.canvas.height), 0, 0);
@@ -439,6 +475,7 @@ var randomize_weights = false;
 var ordered_weights = false;
 var weight_factor = 1.0;
 var contrast_aware_weights = false;
+var contrast_aware_weights2 = false;
 
 
 // Function to perform a circular shift
@@ -472,7 +509,7 @@ const permuteArray = (arr) => {
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights) {
+function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2) {
     // Make a safe, local copy of the original weights
     var original_weights = [...weights];
 
@@ -498,119 +535,184 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
             const i = (y * width + x) * 4;
             const original_val = float_data[i];
             
-        // Determine effective weights based on the selected options
-        let eff_weights = [];
+            // Determine effective weights based on the selected options
+            let eff_weights = [];
         
-        if (contrast_aware_weights) {
-            // 1. Calculate weights based on local contrast
-            let diff = [0, 0, 0, 0];
-            let sum_diff = 0;
+            if (contrast_aware_weights) {
+                // 1. Calculate weights based on local contrast
+                let diff = [0, 0, 0, 0];
+                let sum_diff = 0;
             
-            // Neighbor 0: Right
-            if ((x + x_step >= 0) && (x + x_step < width)) {
-                diff[0] = Math.abs(float_data[i + x_step * 4] - original_val);
-                sum_diff += diff[0];
-            }
-            // Neighbor 1: Bottom-left
-            if ((y + 1 < height) && (x - x_step >= 0) && (x - x_step < width)) {
-                const index = i + width * 4 - x_step * 4;
-                diff[1] = Math.abs(float_data[index] - original_val);
-                sum_diff += diff[1];
-            }
-            // Neighbor 2: Bottom
-            if (y + 1 < height) {
-                const index = i + width * 4;
-                diff[2] = Math.abs(float_data[index] - original_val);
-                sum_diff += diff[2];
-            }
-            // Neighbor 3: Bottom-right
-            if ((y + 1 < height) && (x + x_step >= 0) && (x + x_step < width)) {
-                const index = i + width * 4 + x_step * 4;
-                diff[3] = Math.abs(float_data[index] - original_val);
-                sum_diff += diff[3];
-            }
-        
-            // 2. Normalize differences to get the contrast-aware weights
-            let base_weights = [0, 0, 0, 0];
-            if (sum_diff > 0) {
-                for (let k = 0; k < diff.length; k++) {
-                    base_weights[k] = diff[k] / sum_diff;
+                // Neighbor 0: Right
+                if ((x + x_step >= 0) && (x + x_step < width)) {
+                    diff[0] = Math.abs(float_data[i + x_step * 4] - original_val);
+                    sum_diff += diff[0];
                 }
-            } else {
-                base_weights = [0.25, 0.25, 0.25, 0.25];
-            }
+                // Neighbor 1: Bottom-left
+                if ((y + 1 < height) && (x - x_step >= 0) && (x - x_step < width)) {
+                    const index = i + width * 4 - x_step * 4;
+                    diff[1] = Math.abs(float_data[index] - original_val);
+                    sum_diff += diff[1];
+                }
+                // Neighbor 2: Bottom
+                if (y + 1 < height) {
+                    const index = i + width * 4;
+                    diff[2] = Math.abs(float_data[index] - original_val);
+                    sum_diff += diff[2];
+                }
+                // Neighbor 3: Bottom-right
+                if ((y + 1 < height) && (x + x_step >= 0) && (x + x_step < width)) {
+                    const index = i + width * 4 + x_step * 4;
+                    diff[3] = Math.abs(float_data[index] - original_val);
+                    sum_diff += diff[3];
+                }
         
-            // 3. Apply randomization if requested
-            if (randomize_weights) {
-                for (let k = 0; k < base_weights.length; k++) {
-                    // Use the calculated base_weights as the maximum value
-                    eff_weights.push(Math.random() * base_weights[k]);
+                // 2. Normalize differences to get the contrast-aware weights
+                let base_weights = [0, 0, 0, 0];
+                if (sum_diff > 0) {
+                    for (let k = 0; k < diff.length; k++) {
+                        base_weights[k] = diff[k] / sum_diff;
+                    }
+                } else {
+                    base_weights = [0.25, 0.25, 0.25, 0.25];
+                }
+        
+                // 3. Apply randomization if requested
+                if (randomize_weights) {
+                    for (let k = 0; k < base_weights.length; k++) {
+                        // Use the calculated base_weights as the maximum value
+                        eff_weights.push(Math.random() * base_weights[k]);
+                    }
+                    if (ordered_weights) {
+                        // 1. Sort the weights in standard descending order
+                        eff_weights.sort((a, b) => b - a);
+                
+                        // 2. Create a temporary array to hold the new order
+                        const temp_weights = [];
+                
+                        // 3. Manually re-assign to get the desired order
+                        // Largest at position 0
+                        temp_weights[0] = eff_weights[0];
+                
+                        // Third largest at position 1
+                        temp_weights[1] = eff_weights[2];
+                
+                        // Second largest at position 2
+                        temp_weights[2] = eff_weights[1];
+                
+                        // Smallest at position 3
+                        temp_weights[3] = eff_weights[3];
+                
+                        // 4. Assign the correctly ordered array back to eff_weights
+                        eff_weights = temp_weights;
+                    }
+                } else {
+                // Just use the contrast-aware weights directly
+                eff_weights = base_weights;
+            }
+            } else if (randomize_weights) {
+                // Existing logic for random weights based on the original_weights
+                for (let k = 0; k < original_weights.length; k++) {
+                    eff_weights.push(Math.floor(Math.random() * (original_weights[k] + 1)));
                 }
                 if (ordered_weights) {
                     // 1. Sort the weights in standard descending order
                     eff_weights.sort((a, b) => b - a);
-                
+            
                     // 2. Create a temporary array to hold the new order
                     const temp_weights = [];
-                
+            
                     // 3. Manually re-assign to get the desired order
                     // Largest at position 0
                     temp_weights[0] = eff_weights[0];
-                
+            
                     // Third largest at position 1
                     temp_weights[1] = eff_weights[2];
-                
+            
                     // Second largest at position 2
                     temp_weights[2] = eff_weights[1];
-                
+            
                     // Smallest at position 3
                     temp_weights[3] = eff_weights[3];
-                
+            
                     // 4. Assign the correctly ordered array back to eff_weights
                     eff_weights = temp_weights;
                 }
+            } else if (circularweights) { 
+                  original_weights = circularShift(original_weights);
+                  eff_weights = original_weights;
+            } else if (permuteweights) {
+                  eff_weights = permuteArray(original_weights);
+            } else if (contrast_aware_weights2) {
+                  let w = [0, 0, 0, 0]
+                  let sum_w = 0;
+                  // Neighbor 0: Right
+                  if ((x + x_step >= 0) && (x + x_step < width)) {
+                      w[0] = float_data[i + x_step * 4];
+                      sum_w += w[0];
+                  }
+                  // Neighbor 1: Bottom-left
+                  if ((y + 1 < height) && (x - x_step >= 0) && (x - x_step < width)) {
+                      const index = i + width * 4 - x_step * 4;
+                      w[1] = float_data[index];
+                      sum_w += w[1];
+                  }
+                  // Neighbor 2: Bottom
+                  if (y + 1 < height) {
+                      const index = i + width * 4;
+                      w[2] = float_data[index];
+                      sum_w += w[2];
+                  }
+                  // Neighbor 3: Bottom-right
+                  if ((y + 1 < height) && (x + x_step >= 0) && (x + x_step < width)) {
+                      const index = i + width * 4 + x_step * 4;
+                      w[3] = float_data[index];
+                      sum_w += w[3];
+                  }
+             
+                  // 2. Normalize differences to get the contrast-aware weights
+                  if (sum_w > 0) {
+                      for (let k = 0; k < w.length; k++) {
+                          w[k] = w[k] / sum_w;
+                      }
+                  } else {
+                      w = [0.25, 0.25, 0.25, 0.25];
+                  }
+
+                  // 3. Apply randomization if requested
+                  if (randomize_weights) {
+                      for (let k = 0; k < w.length; k++) {
+                          // Use the calculated base_weights as the maximum value
+                          eff_weights.push(Math.random() * w[k]);
+                      }
+                      if (ordered_weights) {
+                          // 1. Sort the weights in standard descending order
+                          eff_weights.sort((a, b) => b - a);
+                          // 2. Create a temporary array to hold the new order
+                          const temp_weights = [];
+                          // 3. Manually re-assign to get the desired order
+                          // Largest at position 0
+                          temp_weights[0] = eff_weights[0];
+                
+                          // Third largest at position 1
+                          temp_weights[1] = eff_weights[2];
+                
+                          // Second largest at position 2
+                          temp_weights[2] = eff_weights[1];
+                
+                          // Smallest at position 3
+                          temp_weights[3] = eff_weights[3];
+                
+                          // 4. Assign the correctly ordered array back to eff_weights
+                          eff_weights = temp_weights;
+                      }
+                  } else {
+                      eff_weights = w;
+                  }
             } else {
-                // Just use the contrast-aware weights directly
-                eff_weights = base_weights;
+                  // Default weights
+                  eff_weights = original_weights;
             }
-        
-        } else if (randomize_weights) {
-            // Existing logic for random weights based on the original_weights
-            for (let k = 0; k < original_weights.length; k++) {
-                eff_weights.push(Math.floor(Math.random() * (original_weights[k] + 1)));
-            }
-            if (ordered_weights) {
-                // 1. Sort the weights in standard descending order
-                eff_weights.sort((a, b) => b - a);
-            
-                // 2. Create a temporary array to hold the new order
-                const temp_weights = [];
-            
-                // 3. Manually re-assign to get the desired order
-                // Largest at position 0
-                temp_weights[0] = eff_weights[0];
-            
-                // Third largest at position 1
-                temp_weights[1] = eff_weights[2];
-            
-                // Second largest at position 2
-                temp_weights[2] = eff_weights[1];
-            
-                // Smallest at position 3
-                temp_weights[3] = eff_weights[3];
-            
-                // 4. Assign the correctly ordered array back to eff_weights
-                eff_weights = temp_weights;
-            }
-        } else if (circularweights) { 
-           original_weights = circularShift(original_weights);
-           eff_weights = original_weights;
-        } else if (permuteweights) {
-           eff_weights = permuteArray(original_weights);
-        } else {
-            // Default weights
-            eff_weights = original_weights;
-        }
 
             const quantized_val = original_val < 128 ? 0 : 255;
             const err = original_val - quantized_val;
