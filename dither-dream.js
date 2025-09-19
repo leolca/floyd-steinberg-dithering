@@ -35,6 +35,52 @@ function initialize() {
     serpentine = this.checked;
     dither();
   });
+  document.getElementById('circularWeights').addEventListener('change', function() {
+    circularweights = this.checked;
+    const randomizeCheckbox = document.getElementById('randomize');
+    const permuteCheckbox = document.getElementById('permuteWeights');
+    const contrastCheckbox = document.getElementById('contrast_aware_weights');
+    if (this.checked) {
+        randomizeCheckbox.disabled = true;
+        randomizeCheckbox.checked = false;
+        randomize_weights = false;
+        permuteCheckbox.disabled = true;
+        permuteCheckbox.checked = false;
+        permuteweights = false;
+        contrastCheckbox.disabled = true;
+        contrastCheckbox.checked = false;
+        contrast_aware_weights = false;
+    } else {
+        randomizeCheckbox.disabled = false;
+        permuteCheckbox.disabled = false;
+        contrastCheckbox.disabled = false;
+    }
+    dither();
+  });
+  document.getElementById('permuteWeights').addEventListener('change', function() {
+    permuteweights = this.checked;
+    const randomizeCheckbox = document.getElementById('randomize');
+    const circularCheckbox = document.getElementById('circularWeights');
+    const contrastCheckbox = document.getElementById('contrast_aware_weights');
+    if (this.checked) {
+        randomizeCheckbox.disabled = true;
+        randomizeCheckbox.checked = false;
+        randomize_weights = false;
+        circularCheckbox.disabled = true;
+        circularCheckbox.checked = false;
+        circularweights = false;
+        contrastCheckbox.disabled = true;
+        contrastCheckbox.checked = false;
+        contrast_aware_weights = false;
+    } else {
+        randomizeCheckbox.disabled = false;
+        circularCheckbox.disabled = false;
+        contrastCheckbox.disabled = false;
+    }
+    dither();
+  });
+
+
   //document.getElementById('randomize').addEventListener('change', function() {
   //  randomize_weights = this.checked;
   //  dither();
@@ -178,12 +224,16 @@ function reset() {
   document.getElementById('contrast').value = 0;
   document.getElementById('contrast-label').innerHTML = 0;
   document.getElementById('serpentine').checked = false;
+  document.getElementById('circularWeights').checked = false;
+  document.getElementById('circularWeights').checked = false;
   document.getElementById('randomize').checked = false;
   document.getElementById('weight_factor_slider').value = 1;
   document.getElementById('weight_factor_value').innerHTML = 1;
   document.getElementById('ordered_weights').checked = false;
   document.getElementById('contrast_aware_weights').checked = false;
   serpentine = false;
+  circularweights = false;
+  permuteweigts = false;
   randomize_weights = false;
   ordered_weights = false;
   weights = [7, 3, 5, 1];
@@ -320,7 +370,7 @@ function dither() {
   let dithered_data = new Uint8ClampedArray(grayscale_data);
   
   // Apply Floyd-Steinberg dithering to the dithered_data
-  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights);
+  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights);
   
   // Update the visible canvas with the final dithered image
   screenctx.putImageData(new ImageData(dithered_data, screenctx.canvas.width, screenctx.canvas.height), 0, 0);
@@ -383,17 +433,48 @@ const file_input = document.getElementById('file_input');
 
 var weights = [7, 3, 5, 1];
 var serpentine = false;
+var circularweights = false;
+var permuteweights = false;
 var randomize_weights = false;
 var ordered_weights = false;
 var weight_factor = 1.0;
 var contrast_aware_weights = false;
 
+
+// Function to perform a circular shift
+const circularShift = (arr) => {
+  if (arr.length <= 1) return arr;
+  const firstElement = arr.shift();
+  arr.push(firstElement);
+  return arr;
+};
+
+// Function to permute the elements of an array using the Fisher-Yates shuffle
+const permuteArray = (arr) => {
+  let arrayToPermute = [...arr]; // Create a copy to avoid modifying the original array
+  let currentIndex = arrayToPermute.length;
+  let randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex > 0) {
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [arrayToPermute[currentIndex], arrayToPermute[randomIndex]] = [
+      arrayToPermute[randomIndex], arrayToPermute[currentIndex]];
+  }
+
+  return arrayToPermute;
+};
+
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights) {
+function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights) {
     // Make a safe, local copy of the original weights
-    const original_weights = [...weights];
+    var original_weights = [...weights];
 
     // 1. Convert the input Uint8ClampedArray to a Float32Array for accurate calculations
     const float_data = new Float32Array(data.length);
@@ -521,6 +602,11 @@ function floyd_steinberg(data, width, height, weights, serpentine, randomize_wei
                 // 4. Assign the correctly ordered array back to eff_weights
                 eff_weights = temp_weights;
             }
+        } else if (circularweights) { 
+           original_weights = circularShift(original_weights);
+           eff_weights = original_weights;
+        } else if (permuteweights) {
+           eff_weights = permuteArray(original_weights);
         } else {
             // Default weights
             eff_weights = original_weights;
