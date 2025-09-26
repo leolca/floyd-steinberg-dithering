@@ -155,6 +155,23 @@ function initialize() {
     dither();
   });
 
+  document.getElementById('block_processing').addEventListener('change', function() {
+      block_processing = this.checked;
+      const blksize = document.getElementById('block_size');
+      if (this.checked) {
+          blksize.style.display = 'block';
+      } else {
+          blksize.style.display = 'none';
+      }
+      dither();
+  });
+
+  // block size slider handle updates
+  document.getElementById('block_size_slider').addEventListener('input', function() {
+    document.getElementById('block_size_value').innerHTML = this.value;
+    block_size = parseInt(this.value);
+    dither();
+  });
 
   // Listen for a change on the dropdown
   image_selector.addEventListener('change', function() {
@@ -270,6 +287,8 @@ function reset() {
   circularweights = false;
   permuteweigts = false;
   randomize_weights = false;
+  block_processing = false;
+  block_size = 32;
   ordered_weights = false;
   weights = [7, 3, 5, 1];
   weight_factor = 1.0;
@@ -403,10 +422,16 @@ function dither() {
   const grayscale_data = grayscale(working_data);
 
   // Make a COPY of the grayscale data to dither, preserving the original grayscale data
-  let dithered_data = new Uint8ClampedArray(grayscale_data);
-  
-  // Apply Floyd-Steinberg dithering to the dithered_data
-  dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2);
+  //let dithered_data = new Uint8ClampedArray(grayscale_data);
+  let dithered_data = grayscale_data.slice();
+ 
+  if(block_processing){
+    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size);
+  }
+  else {
+    // Apply Floyd-Steinberg dithering to the dithered_data
+    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2);
+  }
   
   // Update the visible canvas with the final dithered image
   screenctx.putImageData(new ImageData(dithered_data, screenctx.canvas.width, screenctx.canvas.height), 0, 0);
@@ -472,6 +497,8 @@ var serpentine = false;
 var circularweights = false;
 var permuteweights = false;
 var randomize_weights = false;
+var block_processing = false;
+var block_size = 32;
 var ordered_weights = false;
 var weight_factor = 1.0;
 var contrast_aware_weights = false;
@@ -778,6 +805,56 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
     }
     
     return data;
+}
+
+function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size) {
+    const output_data = new Uint8ClampedArray(data.length);
+    
+    // Loop through the image in block-sized steps
+    for (let y_start = 0; y_start < height; y_start += block_size) {
+        for (let x_start = 0; x_start < width; x_start += block_size) {
+	    //console.log(`Starting Block at: (${x_start}, ${y_start})`);
+            
+            // Define the block's dimensions
+            const block_width = Math.min(block_size, width - x_start);
+            const block_height = Math.min(block_size, height - y_start);
+            const block_data_size = block_width * block_height * 4;
+            
+            // Create a new array for the block's data
+            const block_data = new Uint8ClampedArray(block_data_size);
+            
+            // Extract the data for the current block
+            for (let y = 0; y < block_height; y++) {
+                for (let x = 0; x < block_width; x++) {
+                    const original_index = ((y_start + y) * width + (x_start + x)) * 4;
+                    const block_index = (y * block_width + x) * 4;
+                    
+                    block_data[block_index] = data[original_index];
+                    block_data[block_index + 1] = data[original_index + 1];
+                    block_data[block_index + 2] = data[original_index + 2];
+                    block_data[block_index + 3] = data[original_index + 3];
+                }
+            }
+            
+            // Dither the current block
+            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2);
+            
+            // Copy the dithered block back to the main output array
+            for (let y = 0; y < block_height; y++) {
+                for (let x = 0; x < block_width; x++) {
+                    const original_index = ((y_start + y) * width + (x_start + x)) * 4;
+                    const block_index = (y * block_width + x) * 4;
+                    
+                    output_data[original_index] = dithered_block_data[block_index];
+                    output_data[original_index + 1] = dithered_block_data[block_index + 1];
+                    output_data[original_index + 2] = dithered_block_data[block_index + 2];
+                    output_data[original_index + 3] = dithered_block_data[block_index + 3];
+                }
+            }
+        }
+    }
+    
+    return output_data;
 }
 
 //function floyd_steinberg(data, width, height, weights, serpentine, randomize_weights) {

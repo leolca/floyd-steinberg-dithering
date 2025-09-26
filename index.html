@@ -107,6 +107,15 @@ Image URL:
     <input type="checkbox" id="contrast_aware_weights" name="contrast_aware_weights" />
     <br>
     <br>
+    <label for="block_processing">Block Dithering:</label>
+    <input type="checkbox" id="block_processing" name="block_processing" />
+    <div id="block_size" style="display:none;">
+      <label for="block_size_slider">Block Size:</label>
+      <input type="range" id="block_size_slider" min="8" max="128" value="32" step="8" />
+      <span id="block_size_value">32</span>
+    </div>
+    <br>
+    <br>
     <p>Mean Squared Error (MSE): <span id="mse-label">0.00</span></p>
     <p>Signal-to-Noise Ratio (SNR): <span id="snr-label">0.00 dB</span></p>
     <p>Peak Signal-to-Noise Ratio (PSNR): <span id="psnr-label">0.00 dB</span></p>
