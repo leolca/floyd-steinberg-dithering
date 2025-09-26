@@ -1,8 +1,13 @@
-# Variations on Floyd-Steinberg dithering algorithm
+# Radomize-Floyd: An Interactive Floyd-Steinberg Dithering
 
 Based on [Dither-dream](https://kgjenkins.github.io/dither-dream/), this is a new tool extending the possibilities to explore variations on the Floyd-Steinberg dithering algorithm.
 
-Try it [here](https://leolca.github.io/floyd-steinberg-dithering/)
+
+This project provides an interactive visualization and implementation of the Floyd-Steinberg error diffusion dithering algorithm in JavaScript. Beyond the standard implementation, it offers a suite of advanced controls to experiment with different error distribution strategies, including randomization, ordering, contrast-awareness, and block-based processing.
+
+## 🚀 Live Demo
+
+You can explore the live interface and all its controls [here](https://leolca.github.io/floyd-steinberg-dithering/).
 
 ---
 
@@ -44,7 +49,7 @@ As the scan progresses, in a region of dark (but not completely black) pixels, t
 ![dithering detail](image/detail.png)
 
 
-# Variations
+# Results
 
 I was curious why or how the weighting matrix above was calculated.  Floyd-Steinberg is very fast to compute because it only needs to scan once through each pixel.  That is why the error is not distributed to any of the pixels above or to the left in the current row.  But why the 7, 3, 5, 1 weights?  I haven't seen any explanation of why these specific values were chosen, besides the fact that they add up to 16 (so actually we are adding 7/16 of the error to the pixel to the right).
 
@@ -87,6 +92,60 @@ Finally, we can create some interesting video effects by animating quickly throu
 
 ![glitching the algorithm](image/glitch.gif)
 
+
+# ✨ Features and Controls
+
+The interface provides granular control over nearly every aspect of the error diffusion process.
+
+### Image Selection & Base Settings
+
+| Control | Description |
+| :--- | :--- |
+| **Select an image** | A dropdown menu featuring built-in image options, along with the ability to **upload your own file**. |
+| **Use Serpentine Scanning** | Toggles scanning direction. When checked, the scan direction alternates between left-to-right and right-to-left for every row, which helps break up visible dithering patterns. |
+| **Block Dithering** | When enabled, the image is partitioned into independent square blocks (`Block Size x Block Size`), and the dithering process is run separately on each block. |
+| **Block Size** | A slider to select the size of the blocks (e.g., 8, 16, 32, 64, 128) for Block Dithering. |
+
+### Error Diffusion Weight Controls
+
+These controls modify the weight matrix used to distribute the quantization error to neighboring pixels.
+
+| Control | Description |
+| :--- | :--- |
+| **Weights (4 Sliders)** | Directly control the values assigned to the four neighbor positions (Right, Down-Left, Down, Down-Right). These values act as the **base weights** or the **maximum limits** for randomization. |
+| **Weight Factor** | A multiplier (also known as "forgetfulness") that scales the total error propagated to neighbors. A value less than 1.0 means some error is discarded, often reducing pattern noise at the cost of fidelity. |
+
+#### Dynamic Weight Generation
+
+These options override or modify the base slider weights for dynamic experimentation.
+
+| Control | Description |
+| :--- | :--- |
+| **Draw Weights from Image** | Derives a weight vector based on the **original image's gray levels**. The weights are proportional to the pixel values under the dithering window. |
+| **Draw Weights from Image Diffs** | **Contrast-Aware Dithering**. Derives a weight vector based on the **absolute difference** between the current pixel and its neighbors. Larger differences lead to larger weights, pushing error towards high-contrast areas. |
+| **Circular Weights** | Performs a **circular shift** on the weight vector at each pixel, constantly changing which neighbor receives which weight, potentially breaking patterns. |
+| **Permute Weights** | The four weight values are **randomly permuted** at each pixel, offering high irregularity. |
+
+#### Randomization and Ordering
+
+| Control | Description |
+| :--- | :--- |
+| **Use Random Weights** | If checked, the base weights from the sliders (or the derived weights) are treated as **maximum limits**. The actual weight applied to a neighbor is a random value between 0 and the limit. |
+| **Ordered** | **(Requires "Use Random Weights" to be enabled)**. If checked, the four randomly generated weights are sorted and assigned in a specific order: largest to Right, second-largest to Down, third-largest to Down-Left, and smallest to Down-Right. |
+
+
+
+## 📊 Performance Measures
+
+The interface displays real-time quantitative metrics to evaluate the dithered image against the original (or grayscale) source:
+
+| Measure | Purpose |
+| :--- | :--- |
+| **Mean Squared Error (MSE)** | Measures the average squared difference between the pixel values of the original and dithered images. Lower is better. |
+| **Signal-to-Noise Ratio (SNR)** | Measures the ratio of signal power to noise power. Higher values indicate less noise (error) relative to the image signal. |
+| **Peak Signal-to-Noise Ratio (PSNR)** | Measures the ratio between the maximum possible power of a signal and the power of corrupting noise. Higher is better. |
+| **Structural Similarity Index (SSIM)** | Measures perceived change in the structural information of the image, based on luminance, contrast, and structure. Closer to 1.0 indicates higher fidelity. |
+
 # Your turn
 
-See the [Dither-dream online demo](https://kgjenkins.github.io/dither-dream/) to play with the parameters and see the results for yourself!
+See the [Randomize-Floyd online demo](https://leolca.github.io/floyd-steinberg-dithering/) to play with the parameters and see the results for yourself!
