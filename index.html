@@ -116,6 +116,15 @@ Image URL:
     </div>
     <br>
     <br>
+    <label for="quantize_error_checkbox">Quantize Propagated Error:</label>
+    <input type="checkbox" id="quantize_error_checkbox" />
+    <div id="error-quant-option" style="display:none;">
+      <label for="error_bits_slider">Error Quantization Bits (Qe):</label>
+      <input type="range" id="error_bits_slider" min="1" max="16" value="8" step="1" />
+      <span id="error_bits_value">8</span>
+    </div>
+    <br>
+    <br>
     <p>Mean Squared Error (MSE): <span id="mse-label">0.00</span></p>
     <p>Signal-to-Noise Ratio (SNR): <span id="snr-label">0.00 dB</span></p>
     <p>Peak Signal-to-Noise Ratio (PSNR): <span id="psnr-label">0.00 dB</span></p>
