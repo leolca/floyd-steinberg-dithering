@@ -109,6 +109,16 @@ function initialize() {
     ordered_weights = this.checked;
     dither();
   });
+  document.getElementById('random_weight_factor').addEventListener('change', function() {
+      random_weight_factor = this.checked;
+      if (this.checked) {
+	 document.getElementById('weight_factor_slider').disabled = true;
+      } else {
+	 document.getElementById('weight_factor_slider').disabled = false;
+	 weight_factor = parseFloat(document.getElementById('weight_factor_value').innerHTML);
+      }
+      dither();
+  });
   document.getElementById('weight_factor_slider').addEventListener('input', function() {
     document.getElementById('weight_factor_value').innerHTML = this.value;
     weight_factor = +this.value;
@@ -346,6 +356,7 @@ function reset() {
   circularweights = false;
   permuteweigts = false;
   randomize_weights = false;
+  random_weight_factor = false;
   block_processing = false;
   block_size = 32;
   quantize_error = false;
@@ -492,11 +503,11 @@ function dither() {
   let dithered_data = grayscale_data.slice();
  
   if(block_processing){
-    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
   }
   else {
     // Apply Floyd-Steinberg dithering to the dithered_data
-    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
   }
   
   // Update the visible canvas with the final dithered image
@@ -563,6 +574,7 @@ var serpentine = false;
 var circularweights = false;
 var permuteweights = false;
 var randomize_weights = false;
+var random_weight_factor = false;
 var block_processing = false;
 var block_size = 32;
 var quantize_error = false;
@@ -672,7 +684,7 @@ const permuteArray = (arr) => {
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
+function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
     // Make a safe, local copy of the original weights
     var original_weights = [...weights];
 
@@ -681,7 +693,7 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
     for (let i = 0; i < data.length; i++) {
         float_data[i] = data[i];
     }
-    
+   
     // 2. Perform all calculations using the floating-point array
     for (var y = 0; y < height; y++) {
         let x_start = 0;
@@ -702,6 +714,12 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
             // Determine effective weights based on the selected options
             let eff_weights = [];
         
+	    if (random_weight_factor) {
+                //weight_factor = 0.9 + 0.1*Math.random();
+		weight_factor = Math.random();
+		//weight_factor = getNormalRandom(0.8,0.5);
+	    }
+ 
             if (contrast_aware_weights) {
                 // 1. Calculate weights based on local contrast
                 let diff = [0, 0, 0, 0];
@@ -1046,7 +1064,7 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
     return data;
 }
 
-function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
+function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
     const output_data = new Uint8ClampedArray(data.length);
     
     // Loop through the image in block-sized steps
@@ -1076,7 +1094,7 @@ function process_blocks(data, width, height, weights, serpentine, circularweight
             }
             
             // Dither the current block
-            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
             
             // Copy the dithered block back to the main output array
             for (let y = 0; y < block_height; y++) {
@@ -1352,3 +1370,16 @@ function calculateSSIM(originalData, ditheredData, width, height) {
     // Return the average SSIM score for the whole image
     return ssim_total / num_windows;
 }
+
+function getNormalRandom(mean = 0, stdDev = 1) {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random(); //Ensures u is not zero
+    while (v === 0) v = Math.random(); //Ensures v is not zero
+
+    const z0 = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    // const z1 = Math.sqrt(-2.0 * Math.log(u)) * Math.sin(2.0 * Math.PI * v); // If you need a second independent normal variable
+
+    // Scale and shift to desired mean and standard deviation
+    return z0 * stdDev + mean;
+}
+
