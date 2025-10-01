@@ -125,6 +125,19 @@ Image URL:
     </div>
     <br>
     <br>
+    <label for="filter_blur_checkbox">Apply Filter Blur:</label>
+    <input type="checkbox" id="filter_blur_checkbox" />
+    <div id="filter-blur-option" style="display:none;">
+        <label for="filter_size_slider">Filter Size:</label>
+        <input type="range" id="filter_size_slider" min="1" max="7" value="1" step="1" />
+        <span id="filter_size_value">1</span>
+	<br>
+        <label for="blur_threshold_slider">Blur Edge Threshold:</label>
+        <input type="range" id="blur_threshold_slider" min="0.0" max="1.0" value="0.1" step="0.01" />
+        <span id="blur_threshold_value">0.1</span>
+    </div>
+    <br>
+    <br>
     <label for="quantize_error_checkbox">Quantize Propagated Error:</label>
     <input type="checkbox" id="quantize_error_checkbox" />
     <div id="error-quant-option" style="display:none;">

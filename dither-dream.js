@@ -207,6 +207,31 @@ function initialize() {
       dither();
   });
 
+
+  document.getElementById('filter_blur_checkbox').addEventListener('change', function() {
+      const blurOption = document.getElementById('filter-blur-option');
+      use_filter_blur = this.checked;
+      if (this.checked) {
+          blurOption.style.display = 'block';
+      } else {
+          blurOption.style.display = 'none';
+      }
+      dither();
+  });
+  
+  document.getElementById('filter_size_slider').addEventListener('input', function() {
+      document.getElementById('filter_size_value').textContent = this.value;
+      filter_size = parseInt(document.getElementById('filter_size_slider').value);
+      dither();
+  });
+
+
+  document.getElementById('blur_threshold_slider').addEventListener('input', function() {
+      document.getElementById('blur_threshold_value').textContent = this.value;
+      blur_threshold = parseFloat(this.value);
+      dither();
+  });
+
   // Listen for a change on the dropdown
   image_selector.addEventListener('change', function() {
     const selected_value = this.value;
@@ -328,6 +353,9 @@ function reset() {
   ordered_weights = false;
   edge_switch = false;
   edge_threshold = 0.1;
+  blur_threshold = 0.1;
+  use_filter_blur = false;
+  filter_size = 1;
   weights = [7, 3, 5, 1];
   weight_factor = 1.0;
   contrast_aware_weights = false;
@@ -464,11 +492,11 @@ function dither() {
   let dithered_data = grayscale_data.slice();
  
   if(block_processing){
-    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold);
+    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
   }
   else {
     // Apply Floyd-Steinberg dithering to the dithered_data
-    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold);
+    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
   }
   
   // Update the visible canvas with the final dithered image
@@ -544,7 +572,74 @@ var weight_factor = 1.0;
 var contrast_aware_weights = false;
 var contrast_aware_weights2 = false;
 var edge_switch = false;
+var use_filter_blur = false;
+var filter_size = 1;
 var edge_threshold = 0.1;
+var blur_threshold = 0.1;
+
+const BLUR_MATRICES = {
+    // Size 1: (1+1)x(2*1+1) = 2x3 matrix. Current pixel is at M[1][1].
+    // Let's adjust the size based on your example: 4x2 is unusual for a filter,
+    // so we'll assume a standard 3x3 to 5x5 filter shape for demonstration,
+    // but the logic below adheres to the (s+1) x (2s+1) concept.
+
+    1: [ // 2x3 matrix (s+1)x(2s+1)
+        [0.211, 0.197, 0.211],
+        [0.197, 0.184, 0.000] // M[1][1] = 0.128 is the current pixel
+    ],
+
+    2: [ // 3x5 matrix (3x5)
+        // ... Fill in your actual values ...
+        [0.086, 0.080, 0.075, 0.080, 0.086],
+        [0.080, 0.075, 0.070, 0.075, 0.0800], // M[2][2] is current pixel
+        [0.075, 0.070, 0.065, 0    , 0     ]
+    ],
+
+    3: [ // 4x7 matrix (3x5)
+	[0.048, 0.045, 0.042, 0.039, 0.042, 0.045, 0.048],
+	[0.045, 0.042, 0.039, 0.036, 0.039, 0.042, 0.045],
+	[0.042, 0.039, 0.036, 0.034, 0.036, 0.039, 0.042],
+	[0.039, 0.036, 0.034, 0.031, 0.000, 0.000, 0.000]
+    ],
+
+    4: [
+	[0.031, 0.029, 0.027, 0.025, 0.024, 0.025, 0.027, 0.029, 0.031],
+	[0.029, 0.027, 0.025, 0.024, 0.022, 0.024, 0.025, 0.027, 0.029],
+	[0.027, 0.025, 0.023, 0.022, 0.020, 0.022, 0.023, 0.025, 0.027],
+	[0.025, 0.024, 0.022, 0.020, 0.019, 0.020, 0.022, 0.024, 0.025],
+	[0.024, 0.022, 0.020, 0.019, 0.018, 0.000, 0.000, 0.000, 0.000]
+    ],
+
+    5: [
+	[0.022, 0.021, 0.019, 0.018, 0.017, 0.016, 0.017, 0.018, 0.019, 0.021, 0.022],
+	[0.021, 0.019, 0.018, 0.017, 0.016, 0.015, 0.016, 0.017, 0.018, 0.019, 0.021],
+	[0.019, 0.018, 0.017, 0.016, 0.015, 0.014, 0.015, 0.016, 0.017, 0.018, 0.019],
+        [0.018, 0.017, 0.016, 0.015, 0.014, 0.013, 0.014, 0.015, 0.016, 0.017, 0.018],
+	[0.017, 0.016, 0.015, 0.014, 0.013, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017],
+	[0.016, 0.015, 0.014, 0.013, 0.012, 0.011, 0.000, 0.000, 0.000, 0.000, 0.000],
+    ],
+
+    6: [
+	[0.017, 0.016, 0.015, 0.014, 0.013, 0.012, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016, 0.017],
+	[0.016, 0.015, 0.014, 0.013, 0.012, 0.011, 0.011, 0.011, 0.012, 0.013, 0.014, 0.015, 0.016],
+	[0.015, 0.014, 0.013, 0.012, 0.011, 0.010, 0.010, 0.010, 0.011, 0.012, 0.013, 0.014, 0.015],
+	[0.014, 0.013, 0.012, 0.011, 0.010, 0.010, 0.009, 0.010, 0.010, 0.011, 0.012, 0.013, 0.014],
+	[0.013, 0.012, 0.011, 0.010, 0.010, 0.009, 0.008, 0.009, 0.010, 0.010, 0.011, 0.012, 0.013],
+	[0.012, 0.011, 0.010, 0.010, 0.009, 0.008, 0.008, 0.008, 0.009, 0.010, 0.010, 0.011, 0.012],
+	[0.011, 0.011, 0.010, 0.009, 0.008, 0.008, 0.007, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000],
+    ],
+
+    7: [
+	[0.014, 0.013, 0.012, 0.011, 0.010, 0.010, 0.009, 0.009, 0.009, 0.010, 0.010, 0.011, 0.012, 0.013, 0.014],
+	[0.013, 0.012, 0.011, 0.010, 0.010, 0.009, 0.008, 0.008, 0.008, 0.009, 0.010, 0.010, 0.011, 0.012, 0.013],
+	[0.012, 0.011, 0.010, 0.010, 0.009, 0.008, 0.008, 0.007, 0.008, 0.008, 0.009, 0.010, 0.010, 0.011, 0.012],
+	[0.011, 0.010, 0.010, 0.009, 0.008, 0.008, 0.007, 0.007, 0.007, 0.008, 0.008, 0.009, 0.010, 0.010, 0.011],
+	[0.010, 0.009, 0.008, 0.008, 0.007, 0.007, 0.006, 0.006, 0.006, 0.007, 0.007, 0.008, 0.008, 0.009, 0.010],
+	[0.010, 0.009, 0.008, 0.008, 0.007, 0.007, 0.006, 0.006, 0.006, 0.007, 0.007, 0.008, 0.008, 0.009, 0.010],
+	[0.009, 0.008, 0.008, 0.007, 0.007, 0.006, 0.006, 0.006, 0.006, 0.006, 0.007, 0.007, 0.008, 0.008, 0.009],
+	[0.009, 0.008, 0.007, 0.007, 0.006, 0.006, 0.006, 0.005, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000, 0.000],
+    ],
+};
 
 // Function to perform a circular shift
 const circularShift = (arr) => {
@@ -577,7 +672,7 @@ const permuteArray = (arr) => {
 // original pixel data
 let original_img_data; 
 
-function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold) {
+function floyd_steinberg(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
     // Make a safe, local copy of the original weights
     var original_weights = [...weights];
 
@@ -602,6 +697,7 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
         for (var x = x_start; x !== x_end; x += x_step) {
             const i = (y * width + x) * 4;
             const original_val = float_data[i];
+	    //console.log(`OV: ${original_val}`);
             
             // Determine effective weights based on the selected options
             let eff_weights = [];
@@ -785,6 +881,72 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
             const quantized_val = original_val < 128 ? 0 : 255;
             var err = original_val - quantized_val;
 
+	    // Now, apply the dithered value to the current pixel
+            float_data[i] = quantized_val;
+            float_data[i + 1] = quantized_val;
+            float_data[i + 2] = quantized_val;
+            float_data[i + 3] = 255; 
+
+	    // FILTER BLUR LOGIC
+            if (use_filter_blur) {
+		// --- Step 1: Detect Edge (Same logic as Edge Switch) ---
+                let neighbor_b = 0; // Neighbor behind (I(i,j-1))
+                let neighbor_a = 0; // Neighbor above (I(i-1,j))
+
+                // Get neighbor behind (j-1, which is x - x_step)
+                const behind_x = x - x_step;
+                if (behind_x >= 0 && behind_x < width) {
+                    neighbor_b = float_data[i - x_step * 4];
+                }
+
+                // Get neighbor above (i-1, which is y - 1)
+                const above_y = y - 1;
+                if (above_y >= 0 && above_y < height) {
+                    neighbor_a = float_data[i - width * 4];
+                }
+
+                // Calculate the average of the two processed neighbors
+                const neighbors_avg = (neighbor_b + neighbor_a) / 2.0;
+
+		// Check the condition: Edge detected for blur?
+                if (Math.abs(original_val - neighbors_avg) > blur_threshold*255) {
+                    const filter = BLUR_MATRICES[filter_size];
+                    const rows = filter.length;     // s+1
+                    const cols = filter[0].length;  // 2s+1
+                    const s = filter_size;
+                    let blur_estimate = 0.0;
+
+                    // Convolution loop to calculate blur estimate (b)
+                    // The current pixel is at M[s][s]. We loop through the filter matrix.
+                    for (let fy = 0; fy < rows; fy++) {
+                        for (let fx = 0; fx < cols; fx++) {
+                            // Calculate image coordinates (ix, iy) relative to current pixel (x, y)
+                            // fy-s and fx-s give the offset from the center of the filter (the current pixel).
+                            const iy = y + (fy - s); 
+                            const ix = x + (fx - s); 
+
+                            // Check bounds: only apply to already processed area
+                            // We check for ix, iy within image bounds AND iy < y (above rows) OR (iy == y AND ix < x) (previous pixels on current row)
+                            // Since the pre-computed matrix should already have 0s for future pixels, 
+                            // we primarily need to ensure we don't read beyond the image boundaries.
+                            
+                            if (iy >= 0 && iy < height && ix >= 0 && ix < width) {
+                                const pixel_index = (iy * width + ix) * 4;
+                                
+                                // Get the already processed (quantized) value
+                                const pixel_value = float_data[pixel_index]; 
+                                
+                                // Accumulate the weighted value
+                                blur_estimate += pixel_value * filter[fy][fx];
+                            }
+                        }
+                    }
+                    
+                    // Use the blur estimate to compute the error to be diffused
+		    err = original_val - blur_estimate;
+		    //console.log(`Original value: ${original_val}, Blur Estimate: ${blur_estimate}, Err: ${original_val - quantized_val}, Blur-Err: ${err}`);
+		}
+	    }
 
 	    // EDGE SWITCH LOGIC
 	    if (edge_switch) {
@@ -826,12 +988,6 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
                 // Quantize the error: round(error / step_size) * step_size
                 err = Math.round(err / step_size) * step_size;
             }
-
-            // Now, apply the dithered value to the current pixel
-            float_data[i] = quantized_val;
-            float_data[i + 1] = quantized_val;
-            float_data[i + 2] = quantized_val;
-            float_data[i + 3] = 255; 
 
             let available_weights_sum = 0;
             const ahead_x = x + x_step;
@@ -890,7 +1046,7 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
     return data;
 }
 
-function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold) {
+function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
     const output_data = new Uint8ClampedArray(data.length);
     
     // Loop through the image in block-sized steps
@@ -920,7 +1076,7 @@ function process_blocks(data, width, height, weights, serpentine, circularweight
             }
             
             // Dither the current block
-            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold);
+            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
             
             // Copy the dithered block back to the main output array
             for (let y = 0; y < block_height; y++) {
