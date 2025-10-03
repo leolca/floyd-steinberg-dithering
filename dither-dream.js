@@ -33,7 +33,22 @@ function initialize() {
   });
   document.getElementById('serpentine').addEventListener('change', function() {
     serpentine = this.checked;
+    if (this.checked) {
+	    document.getElementById('metaxas_scan_checkbox').checked = false;
+	    metaxas = false;
+    }
     dither();
+  });
+  document.getElementById('metaxas_scan_checkbox').addEventListener('change', function() {
+      metaxas = this.checked;
+      if (this.checked) {
+          // Disable serpentine scanning if Metaxas is active
+          document.getElementById('serpentine').checked = false;
+	  serpentine = false;
+	  document.getElementById('block_processing').checked = false;
+	  block_processing = false;
+      }
+      dither();
   });
   document.getElementById('circularWeights').addEventListener('change', function() {
     circularweights = this.checked;
@@ -170,6 +185,8 @@ function initialize() {
       const blksize = document.getElementById('block_size');
       if (this.checked) {
           blksize.style.display = 'block';
+	  document.getElementById('metaxas_scan_checkbox').checked = false;
+          metaxas = false;
       } else {
           blksize.style.display = 'none';
       }
@@ -180,6 +197,16 @@ function initialize() {
   document.getElementById('block_size_slider').addEventListener('input', function() {
     document.getElementById('block_size_value').innerHTML = this.value;
     block_size = parseInt(this.value);
+    dither();
+  });
+
+  document.getElementById('random_symmetry_checkbox').addEventListener('change', function() {
+    use_symmetry = document.getElementById('random_symmetry_checkbox').checked;
+    dither();
+  });
+
+  document.getElementById('flip_only_checkbox').addEventListener('change', function() {
+    flip_only = document.getElementById('flip_only_checkbox').checked;
     dither();
   });
 
@@ -353,12 +380,15 @@ function reset() {
   document.getElementById('contrast_aware_weights').checked = false;
   document.getElementById('contrast_aware_weights2').checked = false;
   serpentine = false;
+  metaxas = false;
   circularweights = false;
   permuteweigts = false;
   randomize_weights = false;
   random_weight_factor = false;
   block_processing = false;
   block_size = 32;
+  use_symmetry = false;
+  flip_only = false;
   quantize_error = false;
   error_bits = 8;
   ordered_weights = false;
@@ -503,11 +533,16 @@ function dither() {
   let dithered_data = grayscale_data.slice();
  
   if(block_processing){
-    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+    dithered_data = process_blocks(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, use_symmetry, flip_only, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
   }
   else {
-    // Apply Floyd-Steinberg dithering to the dithered_data
-    dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+    if (metaxas) {
+	dithered_data = metaxas_scan(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+
+    } else {
+        // Apply Floyd-Steinberg dithering to the dithered_data
+        dithered_data = floyd_steinberg(dithered_data, screenctx.canvas.width, screenctx.canvas.height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+    }
   }
   
   // Update the visible canvas with the final dithered image
@@ -571,12 +606,15 @@ const file_input = document.getElementById('file_input');
 
 var weights = [7, 3, 5, 1];
 var serpentine = false;
+var metaxas = false;
 var circularweights = false;
 var permuteweights = false;
 var randomize_weights = false;
 var random_weight_factor = false;
 var block_processing = false;
 var block_size = 32;
+var use_symmetry = false;
+var flip_only = false;
 var quantize_error = false;
 var error_bits = 8;
 var ordered_weights = false;
@@ -1064,7 +1102,400 @@ function floyd_steinberg(data, width, height, weights, serpentine, circularweigh
     return data;
 }
 
-function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
+function metaxas_scan(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
+    // Make a safe, local copy of the original weights
+    var original_weights = [...weights];
+
+    // 1. Convert the input Uint8ClampedArray to a Float32Array for accurate calculations
+    const float_data = new Float32Array(data.length);
+    for (let i = 0; i < data.length; i++) {
+        float_data[i] = data[i];
+    }
+    
+    // Total number of time steps (k)
+    const max_k = 2 * (height + width) - 1;
+
+
+    // Loop through each time step k (1-based index for the schedule)
+    for (let k = 1; k <= max_k; k++) {
+        // Determine the maximum row index for this time step
+        const max_i = Math.ceil(k / 2); 
+
+        // Loop through the rows (i, which corresponds to y)
+        // i_1based runs from 1 to max_i
+        for (let i_1based = 1; i_1based <= max_i; i_1based++) {
+            
+            // Convert to 0-based row index (y)
+            const y = i_1based - 1; 
+            
+            // Calculate column index (j, which corresponds to x) using the formula
+            // j = k - (i_1based - 1) * 2
+            const x = k - 1 - (i_1based - 1) * 2; 
+
+            // Check boundaries: Only process pixels that are actually inside the image
+            if (y >= 0 && y < height && x >= 0 && x < width) {
+		let x_step = 1;
+                
+                // The core dithering logic for pixel (x, y) goes here
+                const i = (y * width + x) * 4;
+                const original_val = float_data[i];
+
+                // Determine effective weights based on the selected options
+                let eff_weights = [];
+
+                if (random_weight_factor) {
+                    //weight_factor = 0.9 + 0.1*Math.random();
+                    weight_factor = Math.random();
+                    //weight_factor = getNormalRandom(0.8,0.5);
+                }
+ 
+                if (contrast_aware_weights) {
+                    // 1. Calculate weights based on local contrast
+                    let diff = [0, 0, 0, 0];
+                    let sum_diff = 0;
+                
+                    // Neighbor 0: Right
+                    if ((x + x_step >= 0) && (x + x_step < width)) {
+                        diff[0] = Math.abs(float_data[i + x_step * 4] - original_val);
+                        sum_diff += diff[0];
+                    }
+                    // Neighbor 1: Bottom-left
+                    if ((y + 1 < height) && (x - x_step >= 0) && (x - x_step < width)) {
+                        const index = i + width * 4 - x_step * 4;
+                        diff[1] = Math.abs(float_data[index] - original_val);
+                        sum_diff += diff[1];
+                    }
+                    // Neighbor 2: Bottom
+                    if (y + 1 < height) {
+                        const index = i + width * 4;
+                        diff[2] = Math.abs(float_data[index] - original_val);
+                        sum_diff += diff[2];
+                    }
+                    // Neighbor 3: Bottom-right
+                    if ((y + 1 < height) && (x + x_step >= 0) && (x + x_step < width)) {
+                        const index = i + width * 4 + x_step * 4;
+                        diff[3] = Math.abs(float_data[index] - original_val);
+                        sum_diff += diff[3];
+                    }
+        
+                    // 2. Normalize differences to get the contrast-aware weights
+                    let base_weights = [0, 0, 0, 0];
+                    if (sum_diff > 0) {
+                        for (let k = 0; k < diff.length; k++) {
+                            base_weights[k] = diff[k] / sum_diff;
+                        }
+                    } else {
+                        base_weights = [0.25, 0.25, 0.25, 0.25];
+                    }
+        
+                    // 3. Apply randomization if requested
+                    if (randomize_weights) {
+                        for (let k = 0; k < base_weights.length; k++) {
+                            // Use the calculated base_weights as the maximum value
+                            eff_weights.push(Math.random() * base_weights[k]);
+                        }
+                        if (ordered_weights) {
+                            // 1. Sort the weights in standard descending order
+                            eff_weights.sort((a, b) => b - a);
+                    
+                            // 2. Create a temporary array to hold the new order
+                            const temp_weights = [];
+                    
+                            // 3. Manually re-assign to get the desired order
+                            // Largest at position 0
+                            temp_weights[0] = eff_weights[0];
+                    
+                            // Third largest at position 1
+                            temp_weights[1] = eff_weights[2];
+                    
+                            // Second largest at position 2
+                            temp_weights[2] = eff_weights[1];
+                    
+                            // Smallest at position 3
+                            temp_weights[3] = eff_weights[3];
+                    
+                            // 4. Assign the correctly ordered array back to eff_weights
+                            eff_weights = temp_weights;
+                        }
+                    } else {
+                    // Just use the contrast-aware weights directly
+                    eff_weights = base_weights;
+                }
+                } else if (randomize_weights) {
+                    // Existing logic for random weights based on the original_weights
+                    for (let k = 0; k < original_weights.length; k++) {
+                        eff_weights.push(Math.floor(Math.random() * (original_weights[k] + 1)));
+                    }
+                    if (ordered_weights) {
+                        // 1. Sort the weights in standard descending order
+                        eff_weights.sort((a, b) => b - a);
+                
+                        // 2. Create a temporary array to hold the new order
+                        const temp_weights = [];
+                
+                        // 3. Manually re-assign to get the desired order
+                        // Largest at position 0
+                        temp_weights[0] = eff_weights[0];
+                
+                        // Third largest at position 1
+                        temp_weights[1] = eff_weights[2];
+                
+                        // Second largest at position 2
+                        temp_weights[2] = eff_weights[1];
+                
+                        // Smallest at position 3
+                        temp_weights[3] = eff_weights[3];
+                
+                        // 4. Assign the correctly ordered array back to eff_weights
+                        eff_weights = temp_weights;
+                    }
+                } else if (circularweights) { 
+                      original_weights = circularShift(original_weights);
+                      eff_weights = original_weights;
+                } else if (permuteweights) {
+                      eff_weights = permuteArray(original_weights);
+                } else if (contrast_aware_weights2) {
+                      let w = [0, 0, 0, 0]
+                      let sum_w = 0;
+                      // Neighbor 0: Right
+                      if ((x + x_step >= 0) && (x + x_step < width)) {
+                          w[0] = float_data[i + x_step * 4];
+                          sum_w += w[0];
+                      }
+                      // Neighbor 1: Bottom-left
+                      if ((y + 1 < height) && (x - x_step >= 0) && (x - x_step < width)) {
+                          const index = i + width * 4 - x_step * 4;
+                          w[1] = float_data[index];
+                          sum_w += w[1];
+                      }
+                      // Neighbor 2: Bottom
+                      if (y + 1 < height) {
+                          const index = i + width * 4;
+                          w[2] = float_data[index];
+                          sum_w += w[2];
+                      }
+                      // Neighbor 3: Bottom-right
+                      if ((y + 1 < height) && (x + x_step >= 0) && (x + x_step < width)) {
+                          const index = i + width * 4 + x_step * 4;
+                          w[3] = float_data[index];
+                          sum_w += w[3];
+                      }
+                 
+                      // 2. Normalize differences to get the contrast-aware weights
+                      if (sum_w > 0) {
+                          for (let k = 0; k < w.length; k++) {
+                              w[k] = w[k] / sum_w;
+                          }
+                      } else {
+                          w = [0.25, 0.25, 0.25, 0.25];
+                      }
+
+                      // 3. Apply randomization if requested
+                      if (randomize_weights) {
+                          for (let k = 0; k < w.length; k++) {
+                              // Use the calculated base_weights as the maximum value
+                              eff_weights.push(Math.random() * w[k]);
+                          }
+                          if (ordered_weights) {
+                              // 1. Sort the weights in standard descending order
+                              eff_weights.sort((a, b) => b - a);
+                              // 2. Create a temporary array to hold the new order
+                              const temp_weights = [];
+                              // 3. Manually re-assign to get the desired order
+                              // Largest at position 0
+                              temp_weights[0] = eff_weights[0];
+                    
+                              // Third largest at position 1
+                              temp_weights[1] = eff_weights[2];
+                    
+                              // Second largest at position 2
+                              temp_weights[2] = eff_weights[1];
+                    
+                              // Smallest at position 3
+                              temp_weights[3] = eff_weights[3];
+                    
+                              // 4. Assign the correctly ordered array back to eff_weights
+                              eff_weights = temp_weights;
+                          }
+                      } else {
+                          eff_weights = w;
+                      }
+                } else {
+                      // Default weights
+                      eff_weights = original_weights;
+                }
+
+		const quantized_val = original_val < 128 ? 0 : 255;
+                var err = original_val - quantized_val;
+
+	        // Now, apply the dithered value to the current pixel
+                float_data[i] = quantized_val;
+                float_data[i + 1] = quantized_val;
+                float_data[i + 2] = quantized_val;
+                float_data[i + 3] = 255; 
+
+	        // FILTER BLUR LOGIC
+                if (use_filter_blur) {
+	            // --- Step 1: Detect Edge (Same logic as Edge Switch) ---
+                    let neighbor_b = 0; // Neighbor behind (I(i,j-1))
+                    let neighbor_a = 0; // Neighbor above (I(i-1,j))
+
+                    // Get neighbor behind (j-1, which is x - x_step)
+                    const behind_x = x - x_step;
+                    if (behind_x >= 0 && behind_x < width) {
+                        neighbor_b = float_data[i - x_step * 4];
+                    }
+
+                    // Get neighbor above (i-1, which is y - 1)
+                    const above_y = y - 1;
+                    if (above_y >= 0 && above_y < height) {
+                        neighbor_a = float_data[i - width * 4];
+                    }
+
+                    // Calculate the average of the two processed neighbors
+                    const neighbors_avg = (neighbor_b + neighbor_a) / 2.0;
+
+	            // Check the condition: Edge detected for blur?
+                    if (Math.abs(original_val - neighbors_avg) > blur_threshold*255) {
+                        const filter = BLUR_MATRICES[filter_size];
+                        const rows = filter.length;     // s+1
+                        const cols = filter[0].length;  // 2s+1
+                        const s = filter_size;
+                        let blur_estimate = 0.0;
+
+                        // Convolution loop to calculate blur estimate (b)
+                        // The current pixel is at M[s][s]. We loop through the filter matrix.
+                        for (let fy = 0; fy < rows; fy++) {
+                            for (let fx = 0; fx < cols; fx++) {
+                                // Calculate image coordinates (ix, iy) relative to current pixel (x, y)
+                                // fy-s and fx-s give the offset from the center of the filter (the current pixel).
+                                const iy = y + (fy - s); 
+                                const ix = x + (fx - s); 
+
+                                // Check bounds: only apply to already processed area
+                                // We check for ix, iy within image bounds AND iy < y (above rows) OR (iy == y AND ix < x) (previous pixels on current row)
+                                // Since the pre-computed matrix should already have 0s for future pixels, 
+                                // we primarily need to ensure we don't read beyond the image boundaries.
+                                
+                                if (iy >= 0 && iy < height && ix >= 0 && ix < width) {
+                                    const pixel_index = (iy * width + ix) * 4;
+                                    
+                                    // Get the already processed (quantized) value
+                                    const pixel_value = float_data[pixel_index]; 
+                                    
+                                    // Accumulate the weighted value
+                                    blur_estimate += pixel_value * filter[fy][fx];
+                                }
+                            }
+                        }
+                        
+                        // Use the blur estimate to compute the error to be diffused
+	                err = original_val - blur_estimate;
+	                //console.log(`Original value: ${original_val}, Blur Estimate: ${blur_estimate}, Err: ${original_val - quantized_val}, Blur-Err: ${err}`);
+	            }
+	        }
+
+	        // EDGE SWITCH LOGIC
+	        if (edge_switch) {
+	           // Get the quantized values of the two key neighbors
+                    let neighbor_b = 0; // Neighbor behind (I(i,j-1))
+                    let neighbor_a = 0; // Neighbor above (I(i-1,j))
+
+                    // Get neighbor behind (j-1, which is x - x_step)
+                    const behind_x = x - x_step;
+                    if (behind_x >= 0 && behind_x < width) {
+                        neighbor_b = float_data[i - x_step * 4];
+                    }
+
+	            // Get neighbor above (i-1, which is y - 1)
+                    const above_y = y - 1;
+                    if (above_y >= 0 && above_y < height) {
+                        // index of the pixel directly above (i - width) * 4
+                        neighbor_a = float_data[i - width * 4];
+                    }
+
+	            // Calculate the average of the two processed neighbors
+                    const neighbors_avg = (neighbor_b + neighbor_a) / 2.0;
+
+                    // Check the edge condition: | I(i,j) - avg | > threshold
+                    if (Math.abs(original_val - neighbors_avg) > edge_threshold*255) {
+                        // Edge detected: set error to zero to prevent diffusion across the boundary
+                        err = 0;
+                    }
+	        }
+
+                // ERROR QUANTIZATION
+                if (quantize_error) {
+                    // The number of discrete steps is 2^Qe
+                    const steps = Math.pow(2, error_bits); 
+                    
+                    // Calculate the size of each step. The full range is 256 (0-255).
+                    const step_size = 256.0 / steps;
+                    
+                    // Quantize the error: round(error / step_size) * step_size
+                    err = Math.round(err / step_size) * step_size;
+                }
+
+                let available_weights_sum = 0;
+                const ahead_x = x + x_step;
+                const bottom_y = y + 1;
+                
+                if (ahead_x >= 0 && ahead_x < width) {
+                    available_weights_sum += eff_weights[0];
+                }
+                if (bottom_y < height) {
+                    if ((x - x_step) >= 0 && (x - x_step) < width) {
+                        available_weights_sum += eff_weights[1];
+                    }
+                    available_weights_sum += eff_weights[2];
+                    if ((x + x_step) >= 0 && (x + x_step) < width) {
+                        available_weights_sum += eff_weights[3];
+                    }
+                }
+
+                if (available_weights_sum === 0) continue;
+
+                if (ahead_x >= 0 && ahead_x < width) {
+                    const weight = (eff_weights[0] / available_weights_sum) * weight_factor;
+                    float_data[i + x_step * 4] += err * weight;
+                    float_data[i + x_step * 4 + 1] += err * weight;
+                    float_data[i + x_step * 4 + 2] += err * weight;
+                }
+                if (bottom_y < height) {
+                    if ((x - x_step) >= 0 && (x - x_step) < width) {
+                        const weight = (eff_weights[1] / available_weights_sum) * weight_factor;
+                        const index = i + width * 4 - x_step * 4;
+                        float_data[index] += err * weight;
+                        float_data[index + 1] += err * weight;
+                        float_data[index + 2] += err * weight;
+                    }
+                    const weight = (eff_weights[2] / available_weights_sum) * weight_factor;
+                    const index = i + width * 4;
+                        float_data[index] += err * weight;
+                        float_data[index + 1] += err * weight;
+                        float_data[index + 2] += err * weight;
+
+                    if ((x + x_step) >= 0 && (x + x_step) < width) {
+                        const weight = (eff_weights[3] / available_weights_sum) * weight_factor;
+                        const index = i + width * 4 + x_step * 4;
+                        float_data[index] += err * weight;
+                        float_data[index + 1] += err * weight;
+                        float_data[index + 2] += err * weight;
+                    }
+                }
+            }
+        }
+    }
+    
+    for (let i = 0; i < data.length; i++) {
+        data[i] = float_data[i];
+    }
+    
+    return data;
+}
+
+
+function process_blocks(data, width, height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, use_symmetry, flip_only, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold) {
     const output_data = new Uint8ClampedArray(data.length);
     
     // Loop through the image in block-sized steps
@@ -1092,20 +1523,131 @@ function process_blocks(data, width, height, weights, serpentine, circularweight
                     block_data[block_index + 3] = data[original_index + 3];
                 }
             }
+
+            // block_width and block_height are equal to block_size for non-edge blocks
+            const N = block_width; // Alias for block size
+
+            // Create a new array for the symmetrical block data
+            let processed_block_data;
+            let final_block_data;
+            let random_op_index = 0;
+
+            if (use_symmetry) {
+                // Choose a random symmetry (0 to 7)
+		if (flip_only) {
+                    // If Flip Only is checked, choose between Identity (0) and Horizontal Flip (4)
+                    random_op_index = (Math.random() < 0.5) ? 0 : 4;
+                } else {
+                    // Choose a random symmetry from all 8 operations
+                    random_op_index = Math.floor(Math.random() * 8);
+                }
+                
+                // 1. APPLY SYMMETRY: Create the transformed block_data
+                processed_block_data = new Uint8ClampedArray(block_data_size);
+            
+                for (let y = 0; y < N; y++) {
+                    for (let x = 0; x < N; x++) {
+                        // Calculate the destination coordinates (x_prime, y_prime) using the FORWARD map
+                        let x_prime, y_prime;
+                        
+                        switch (random_op_index) {
+                            case 0: // Identity
+                                x_prime = x; y_prime = y; break;
+                            case 1: // R 90 CCW
+                                x_prime = y; y_prime = N - 1 - x; break; 
+                            case 2: // R^2 180 CCW
+                                x_prime = N - 1 - x; y_prime = N - 1 - y; break; 
+                            case 3: // R^3 270 CCW
+                                x_prime = N - 1 - y; y_prime = x; break; 
+                            case 4: // Horizontal Flip
+                                x_prime = N - 1 - x; y_prime = y; break; 
+                            case 5: // Vertical Flip
+                                x_prime = x; y_prime = N - 1 - y; break; 
+                            case 6: // Main Diagonal Flip
+                                x_prime = y; y_prime = x; break; 
+                            case 7: // Anti-Diagonal Flip
+                                x_prime = N - 1 - y; y_prime = N - 1 - x; break; 
+                        }
+                        
+                        // src_index: Position in the original block_data (x, y)
+                        const src_index = (y * N + x) * 4;
+                        
+                        // dest_index: Position in the transformed processed_block_data (x_prime, y_prime)
+                        const dest_index = (y_prime * N + x_prime) * 4;
+                        
+                        processed_block_data[dest_index] = block_data[src_index];
+                        processed_block_data[dest_index + 1] = block_data[src_index + 1];
+                        processed_block_data[dest_index + 2] = block_data[src_index + 2];
+                        processed_block_data[dest_index + 3] = block_data[src_index + 3];
+                    }
+                }                
+            } else {
+                // If no symmetry, the processed data is just the extracted data
+                processed_block_data = block_data;
+            }
             
             // Dither the current block
-            const dithered_block_data = floyd_steinberg(block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
-            
+            const dithered_block_data = floyd_steinberg(processed_block_data, block_width, block_height, weights, serpentine, circularweights, permuteweights, randomize_weights, random_weight_factor, ordered_weights, weight_factor, contrast_aware_weights, contrast_aware_weights2, block_size, quantize_error, error_bits, edge_switch, edge_threshold, use_filter_blur, filter_size, blur_threshold);
+
+            // 3. APPLY INVERSE SYMMETRY (if applicable)
+            if (use_symmetry) {
+                final_block_data = new Uint8ClampedArray(block_data_size);
+                // Iterate through the FINAL (output) coordinates (x_prime, y_prime)
+                for (let y_prime = 0; y_prime < N; y_prime++) {
+                    for (let x_prime = 0; x_prime < N; x_prime++) {
+                        
+                        // Use the INVERSE map to find the source coordinates (x, y) 
+                        // in the DITHERED array.
+                        let x, y;
+                        
+                        switch (random_op_index) {
+                            case 0: // I inverse
+                                x = x_prime; y = y_prime; break;
+                            case 1: // R inverse
+                                //x = N - 1 - y_prime; y = x_prime; break; 
+				x = y_prime; y = N - 1 - x_prime; break;
+                            case 2: // R^2 inverse
+                                x = N - 1 - x_prime; y = N - 1 - y_prime; break; 
+                            case 3: // R^3 inverse
+                                //x = y_prime; y = N - 1 - x_prime; break; 
+				x = N - 1 - y_prime; y = x_prime; break;
+                            case 4: // Horizontal Flip inverse
+                                x = N - 1 - x_prime; y = y_prime; break; 
+                            case 5: // Vertical Flip inverse
+                                x = x_prime; y = N - 1 - y_prime; break; 
+                            case 6: // Main Diagonal Flip inverse
+                                x = y_prime; y = x_prime; break; 
+                            case 7: // Anti-Diagonal Flip inverse
+                                x = N - 1 - y_prime; y = N - 1 - x_prime; break; 
+                        }
+                        
+                        // dest_index: Position in the final array we are writing to (x_prime, y_prime)
+                        const dest_index = (y_prime * N + x_prime) * 4;
+                        
+                        // src_index: Position in the dithered array we are reading from (x, y)
+                        const src_index = (y * N + x) * 4;
+                        
+                        // Copy the pixel data
+                        final_block_data[dest_index] = dithered_block_data[src_index];
+                        final_block_data[dest_index + 1] = dithered_block_data[src_index + 1];
+                        final_block_data[dest_index + 2] = dithered_block_data[src_index + 2];
+                        final_block_data[dest_index + 3] = dithered_block_data[src_index + 3];
+                    }
+                }
+            } else {
+                final_block_data = dithered_block_data;
+            }
+
             // Copy the dithered block back to the main output array
             for (let y = 0; y < block_height; y++) {
                 for (let x = 0; x < block_width; x++) {
                     const original_index = ((y_start + y) * width + (x_start + x)) * 4;
                     const block_index = (y * block_width + x) * 4;
                     
-                    output_data[original_index] = dithered_block_data[block_index];
-                    output_data[original_index + 1] = dithered_block_data[block_index + 1];
-                    output_data[original_index + 2] = dithered_block_data[block_index + 2];
-                    output_data[original_index + 3] = dithered_block_data[block_index + 3];
+                    output_data[original_index] = final_block_data[block_index];
+                    output_data[original_index + 1] = final_block_data[block_index + 1];
+                    output_data[original_index + 2] = final_block_data[block_index + 2];
+                    output_data[original_index + 3] = final_block_data[block_index + 3];
                 }
             }
         }
